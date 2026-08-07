@@ -3,4 +3,6 @@ project(CitrusShell C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(CitrusShell main.c)
+add_executable(CitrusShell main.c
+        parser.h
+        parser.c)
