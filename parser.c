@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <glob.h>
 #include <ctype.h>
 #include <unistd.h>
 
@@ -16,6 +17,56 @@ static void safe_append(char *out, size_t *out_len, size_t out_cap, const char *
     size_t n = src_len < space ? src_len : space;
     memcpy(out + *out_len, src, n);
     *out_len += n;
+}
+
+int expand_wildcard(const char *src, char **args, char storage[][MAX_WORD], int *argc, char **word_ptr, size_t *out_len) {
+    char pattern[MAX_WORD] = {0};
+    size_t pat_len = 0;
+    int bytes_read = 0;
+    char *out = *word_ptr;
+
+    // Copy the prefix into the pattern
+    if (*out_len < sizeof(pattern)-1) {
+        memcpy(pattern, out, *out_len);
+        pat_len = *out_len;
+    }
+
+    // Read the rest
+    while (src[bytes_read] && !isspace((unsigned char)src[bytes_read]) &&
+           src[bytes_read] != ';' && src[bytes_read] != '|' &&
+           src[bytes_read] != '<' && src[bytes_read] != '>') {
+        if (pat_len < sizeof(pattern) - 1) {
+            pattern[pat_len++] = src[bytes_read];
+        }
+        bytes_read++;
+           }
+    pattern[pat_len] = '\0';
+
+    glob_t g;
+    int ret = glob(pattern, GLOB_NOCHECK, NULL, &g);
+
+    if (ret == 0 && g.gl_pathc > 0) {
+        for (size_t j = 0; j < g.gl_pathc; j++) {
+            char *current_word = *word_ptr;
+            *out_len = 0; // Reset length for the new word
+            safe_append(current_word, out_len, MAX_WORD, g.gl_pathv[j], strlen(g.gl_pathv[j]));
+            current_word[*out_len] = '\0'; // Terminate
+
+            // Push directly to the args array as a distinct argument
+            if (*argc < MAX_ARGS - 1) {
+                args[(*argc)++] = current_word;
+                *word_ptr = storage[*argc]; // Advance pointer for next word
+                *out_len = 0;
+            }
+        }
+        globfree(&g);
+    } else {
+        //If nothing matched, just keep the string
+        *out_len = 0;
+        safe_append(out, out_len, MAX_WORD, pattern, pat_len);
+    }
+
+    return bytes_read;
 }
 
 int expand_var(const char *in, char *out, size_t *out_len, size_t out_cap, int last_status, pid_t pid) {
@@ -96,11 +147,19 @@ char **tokenize(char *line, int *out_argc, int last_status) {
                     }
                     continue;
                 }
+                // For var
                 if (c == '$') {
                     in_word = true;
                     i += expand_var(line + i, word, &word_len, MAX_WORD, last_status, pid) - 1;
                     continue;
                 }
+                // For wildcards
+                if (c == '*' || c == '?') {
+                    i += expand_wildcard(line + i, args, storage, &argc, &word, &word_len) - 1;
+                    in_word = false;
+                    continue;
+                }
+
                 if (word_len < MAX_WORD - 1) word[word_len++] = c;
                 in_word = true;
                 continue;
