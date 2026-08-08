@@ -7,6 +7,7 @@
 #include <glob.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <pwd.h>
 
 // Appends up to src_len bytes of src into out, clamped so out_len never
 // exceeds (always leaving room for a trailing '\0' later).
@@ -17,6 +18,52 @@ static void safe_append(char *out, size_t *out_len, size_t out_cap, const char *
     size_t n = src_len < space ? src_len : space;
     memcpy(out + *out_len, src, n);
     *out_len += n;
+}
+
+int expand_tilde(const char *in, char *out, size_t *out_len) {
+    // Only expand if ~ is the first char of the word
+
+    int consumed = 1; // skip ~
+    char name[256];
+    int n = 0;
+
+    // Collect optional username after ~
+    while (in[consumed] && in[consumed] != '/' && !isspace((unsigned char)in[consumed])
+           && n < 255) {
+        name[n++] = in[consumed++];
+           }
+    name[n] = '\0';
+
+    const char *homedir = NULL;
+
+    if (n == 0) {
+        // Plain ~ corresponds to current user
+        homedir = getenv("HOME");
+
+        //If no HOME var fall back to password database
+        if (!homedir) {
+            struct passwd *pw = getpwuid(getuid());
+            if (pw) homedir = pw->pw_dir;
+        }
+    }
+    else {
+        // ~username corresponds to that user's home dir
+        struct passwd *pw = getpwnam(name);
+        if (pw) homedir = pw->pw_dir;
+    }
+
+    if (homedir) {
+        size_t hlen = strlen(homedir);
+        memcpy(out + *out_len, homedir, hlen);
+        *out_len += hlen;
+        return consumed;
+    }
+
+    // No match (bad username) leave it as is
+    out[(*out_len)++] = '~';
+    memcpy(out + *out_len, name, n);
+    *out_len += n;
+    return consumed;
 }
 
 int expand_wildcard(const char *src, char **args, char storage[][MAX_WORD], int *argc, char **word_ptr, size_t *out_len) {
@@ -157,6 +204,13 @@ char **tokenize(char *line, int *out_argc, int last_status) {
                 if (c == '*' || c == '?') {
                     i += expand_wildcard(line + i, args, storage, &argc, &word, &word_len) - 1;
                     in_word = false;
+                    continue;
+                }
+
+                // For Tilde (Home Directory)
+                if (c == '~' && word_len == 0) {
+                    in_word = true;
+                    i += expand_tilde(line + i, word, &word_len)-1;
                     continue;
                 }
 
