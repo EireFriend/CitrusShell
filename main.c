@@ -7,8 +7,11 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <errno.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #include "parser.h"
+#include "completion.h"
 
 int get_username(char *username, size_t size) {
     // Uses POSIX getpwuid
@@ -21,7 +24,6 @@ int get_username(char *username, size_t size) {
 
 int main() {
     char *line = NULL;
-    size_t len = 0;
     int last_status = 0;
 
     char username[256] = "user";
@@ -29,23 +31,42 @@ int main() {
 
     char buff[FILENAME_MAX];
 
+    rl_attempted_completion_function = completion; //Tab completion
+    rl_bind_key('\t', rl_menu_complete); // cycle matches in place on repeated Tab
+    rl_variable_bind("completion-ignore-case", "on");
+
     while (1) {
         bool isRootUser = (getuid() == 0);
 
         getcwd(buff, FILENAME_MAX);
         char *folder_name = strrchr(buff, '/');
 
-        printf("%s-citrus [%s] %s ", username, folder_name + 1, isRootUser ? "#" : "$");
-        if (getline(&line, &len, stdin) == -1) break; // Read (Handles Ctrl+D EOF)
+        char prompt[512];
+        snprintf(prompt, sizeof(prompt), "%s-citrus [%s] %s ",
+                 username, folder_name + 1, isRootUser ? "#" : "$");
+
+        line = readline(prompt); // Read (readline handles editing, Ctrl+D EOF)
+        if (!line) break;
 
         line[strcspn(line, "\n")] = 0; // Strip newline
-        if (strlen(line) == 0) continue;
+        if (strlen(line) == 0) {
+            free(line);
+            continue;
+        }
+
+        add_history(line);
 
         int argc;
         char **args = tokenize(line, &argc, last_status);
-        if (argc == 0) continue;
+        if (argc == 0) {
+            free(line);
+            continue;
+        }
 
-        if (strcmp(args[0], "exit") == 0) break;
+        if (strcmp(args[0], "exit") == 0) {
+            free(line);
+            break;
+        }
 
         if (strcmp(args[0], "cd") == 0) {
             const char *target = args[1] ? args[1] : getenv("HOME");
@@ -55,6 +76,7 @@ int main() {
             } else {
                 last_status = 0;
             }
+            free(line);
             continue; // skip fork/exec
         }
 
@@ -87,7 +109,7 @@ int main() {
                 last_status = 128 + WTERMSIG(status);
             }
         }
+        free(line);
     }
-    free(line);
     return 0;
 }
