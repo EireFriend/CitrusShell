@@ -7,7 +7,8 @@ Citrus Shell is a custom shell built from scratch, focused on speed, simplicity,
 ---
 ## Build 🛠️
 ```
-mkdir build & cd build
+mkdir build
+cd build
 cmake ..
 cmake --build .
 ./CitrusShell
