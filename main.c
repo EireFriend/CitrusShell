@@ -75,7 +75,27 @@ void ensure_newline(void) {
     }
 }
 
+static void handle_wait_status(pid_t pid, int status, int *last_status, pid_t *suspended_pid, char *suspended_name, const char *cmd_name) {
+    if (WIFEXITED(status)) {
+        *last_status = WEXITSTATUS(status);
+    } else if (WIFSIGNALED(status)) {
+        *last_status = 128 + WTERMSIG(status);
+        putchar('\n');
+        fflush(stdout);
+    } else if (WIFSTOPPED(status)) {
+        printf("\ncitrus: [suspended] %s (pid %d)\n", cmd_name, pid);
+        *suspended_pid = pid;
+        if (suspended_name != cmd_name) {   //avoid self copy
+            strncpy(suspended_name, cmd_name, 255);
+            suspended_name[255] = '\0';
+        }
+    }
+}
+
 int main() {
+    static pid_t suspended_pid = -1;
+    static char suspended_name[256] = "";
+
     char *line = NULL;
     int last_status = 0;
 
@@ -95,6 +115,7 @@ int main() {
     sa.sa_handler = SIG_IGN;
     sa.sa_flags = 0;
     sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTSTP, &sa, NULL);
 
     while (1) {
         bool isRootUser = (getuid() == 0);
@@ -141,14 +162,34 @@ int main() {
             continue; // skip fork/exec
         }
 
+        if (strcmp(args[0], "fg") == 0) {
+            if (suspended_pid == -1) {
+                fprintf(stderr, "fg: no suspended job\n");
+                free(line);
+                continue;
+            }
+            pid_t resumed = suspended_pid;
+            suspended_pid = -1;
+
+            kill(resumed, SIGCONT);
+
+            int status;
+            waitpid(resumed, &status, WUNTRACED);
+            handle_wait_status(resumed, status, &last_status, &suspended_pid, suspended_name, suspended_name);
+            ensure_newline();
+            free(line);
+            continue;
+        }
+
         // Evaluate
-        pid_t pid = fork();
-        if (pid == 0) {
+        pid_t child_pid = fork();
+        if (child_pid == 0) {
             //Restore default SIGINT behavior in the child only
             sa.sa_handler = SIG_DFL;
             sigemptyset(&sa.sa_mask);
             sa.sa_flags = 0;
             sigaction(SIGINT, &sa, NULL);
+            sigaction(SIGTSTP, &sa, NULL);
 
             execvp(args[0], args); //Child replaces itself with the command
             // execvp only returns on failure
@@ -169,15 +210,8 @@ int main() {
         }
         else {
             int status;
-            wait(&status);
-            if (WIFEXITED(status)) {
-                last_status = WEXITSTATUS(status);
-            }
-            else if (WIFSIGNALED(status)) {
-                last_status = 128 + WTERMSIG(status);
-                putchar('\n');
-                fflush(stdout);
-            }
+            waitpid(child_pid, &status, WUNTRACED);
+            handle_wait_status(child_pid, status, &last_status, &suspended_pid, suspended_name, args[0]);
         }
         ensure_newline();
         free(line);
