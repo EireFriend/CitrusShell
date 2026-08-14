@@ -30,15 +30,17 @@ Citrus Shell is a custom shell built from scratch, focused on speed, simplicity,
 *   **CMake**: Minimum version 3.8 is required.
 *   **C Compiler**: Must support the C11 standard.
 *   **GNU Readline**: The GNU readline library is required.
-    > **macOS Note:** macOS ships with a BSD libedit under the readline name, so you must install the actual GNU readline (e.g., by running `brew install readline`) for the project to link correctly.
+    
+> **macOS Note:** macOS ships with a BSD libedit under the readline name, so you must install the actual GNU readline (e.g., by running `brew install readline`) for the project to link correctly.
 
 ---
 
 ## Build 🛠️
 
-```bash
+```
 mkdir build
 cd build
 cmake ..
 cmake --build .
-./CitrusShell
+./CitrusShell 
+```
