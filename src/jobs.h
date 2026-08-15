@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <stdbool.h>
+#include <signal.h>
 
 #define MAX_JOBS 16
 
@@ -47,8 +48,14 @@ void remove_job(job_t *j);
 // Prints all currently tracked jobs
 void print_jobs(void);
 
-// Asynchronous sweep for background jobs triggered by SIGCHLD
-void async_sigchld_handler(int sig);
+// Set (async-signal-safe only) by the SIGCHLD handler;checked and cleared by the main loop.
+extern volatile sig_atomic_t sigchld_pending;
+
+// Installs the SIGCHLD handler.
+void install_sigchld_handler(void);
+
+// Call from the main loop whenever sigchld_pending is set. Does the waitpid/printf/redisplay work safely, outside signal context.
+void process_pending_sigchld(void);
 
 // Interprets a waitpid() status for a foreground
 void handle_wait_status(pid_t pid, int status, int *last_status, const char *cmd_name);

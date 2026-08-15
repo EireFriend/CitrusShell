@@ -5,7 +5,6 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <readline/readline.h>
-#include <errno.h>
 
 static job_t jobs[MAX_JOBS];
 
@@ -129,48 +128,55 @@ void print_jobs(void) {
     }
 }
 
-void async_sigchld_handler(int sig) {
-    //Save errno because signal handlers can interrupt other functions
-    int saved_errno = errno;
+volatile sig_atomic_t sigchld_pending = 0;
+
+// Only async signal safe operation allowed.
+static void sigchld_flag_handler(int sig) {
+    (void)sig;
+    sigchld_pending = 1;
+}
+
+void install_sigchld_handler(void) {
+    struct sigaction sa;
+    sa.sa_handler = sigchld_flag_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGCHLD, &sa, NULL);
+}
+
+void process_pending_sigchld(void) {
+    sigchld_pending = 0;
     int status;
 
-    //Only check processes in our job table so don't affect foreground waits
     for (int i = 0; i < MAX_JOBS; i++) {
-        if (jobs[i].in_use) {
-            // WNOHANG prevents blocking if the job is still running
-            pid_t pid = waitpid(jobs[i].pid, &status, WNOHANG | WUNTRACED);
+        if (!jobs[i].in_use) continue;
 
-            if (pid > 0) {
-                if (WIFEXITED(status)) {
-                    printf("\r\033[K[%d] +  Done  %s\n", jobs[i].job_id, jobs[i].name);
-                    fflush(stdout);
-                    remove_job(&jobs[i]);
+        pid_t pid = waitpid(jobs[i].pid, &status, WNOHANG | WUNTRACED);
+        if (pid <= 0) continue;
 
-                    rl_on_new_line();
-                    rl_redisplay();
-                }
-                else if (WIFSIGNALED(status)) {
-                    printf("\r\033[K[%d] +  Terminated  %s\n", jobs[i].job_id, jobs[i].name);
-                    fflush(stdout);
-                    remove_job(&jobs[i]);
-
-                    rl_on_new_line();
-                    rl_redisplay();
-                }
-                else if (WIFSTOPPED(status)) {
-                    jobs[i].state = JOB_STOPPED;
-                    touch_job(&jobs[i]);
-                    printf("\r\033[K[%d] +  Stopped  %s\n", jobs[i].job_id, jobs[i].name);
-                    fflush(stdout);
-
-                    rl_on_new_line();
-                    rl_redisplay();
-                }
-            }
+        if (WIFEXITED(status)) {
+            printf("\r\033[K[%d] +  Done  %s\n", jobs[i].job_id, jobs[i].name);
+            fflush(stdout);
+            remove_job(&jobs[i]);
+            rl_on_new_line();
+            rl_redisplay();
+        }
+        else if (WIFSIGNALED(status)) {
+            printf("\r\033[K[%d] +  Terminated  %s\n", jobs[i].job_id, jobs[i].name);
+            fflush(stdout);
+            remove_job(&jobs[i]);
+            rl_on_new_line();
+            rl_redisplay();
+        }
+        else if (WIFSTOPPED(status)) {
+            jobs[i].state = JOB_STOPPED;
+            touch_job(&jobs[i]);
+            printf("\r\033[K[%d] +  Stopped  %s\n", jobs[i].job_id, jobs[i].name);
+            fflush(stdout);
+            rl_on_new_line();
+            rl_redisplay();
         }
     }
-    //Restore global error state
-    errno = saved_errno;
 }
 
 void handle_wait_status(pid_t pid, int status, int *last_status, const char *cmd_name) {

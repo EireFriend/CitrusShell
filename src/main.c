@@ -40,18 +40,18 @@ int main() {
     sigaction(SIGTSTP, &sa, NULL);
     sigaction(SIGTTOU, &sa, NULL);
 
-    struct sigaction sa_chld;
-    sa_chld.sa_handler = async_sigchld_handler;
-    sigemptyset(&sa_chld.sa_mask);
-    //SA_RESTART prevents the signal from aborting the blocking readline() call
-    //SA_NOCLDSTOP prevents the handler from firing just because a child suspended
-    sa_chld.sa_flags = SA_RESTART | SA_NOCLDSTOP;
-    sigaction(SIGCHLD, &sa_chld, NULL);
+    // SIGCHLD handler only sets a flag (async-signal-safe); the loop below
+    // does the actual printing work.
+    install_sigchld_handler();
 
     terminal_save_shell_settings();
 
     setvbuf(stdout, NULL, _IOLBF, 0);
     while (1) {
+        if (sigchld_pending) {
+            process_pending_sigchld();
+        }
+
         bool isRootUser = is_root();
 
         getcwd(buff, FILENAME_MAX);
@@ -159,7 +159,7 @@ int main() {
 
         if (strcmp(args[0], "kill") == 0) {
             if (argc < 2) {
-                fprintf(stderr, "kill: usage: kill <pid> | <name> | %%<job_id>\n");
+                fprintf(stderr, "kill: usage: kill <pid> | <name> | %%<job_id> | %%-\n");
                 free(line);
                 continue;
             }
@@ -167,9 +167,8 @@ int main() {
             pid_t target_pid = -1;
             char *target_arg = args[1];
 
-            //Check if it is a Job ID (starts with '%')
             if (target_arg[0] == '%') {
-                job_t *j = find_job_by_id(atoi(target_arg + 1)); //
+                job_t *j = resolve_job_arg(target_arg);
                 if (j) target_pid = j->pid;
             }
             else {
@@ -186,19 +185,27 @@ int main() {
                 if (is_num) {
                     target_pid = atoi(target_arg);
                 }
-                //If it is not a number or a '%', treat it as a process name
                 else {
                     job_t *j = find_job_by_name(target_arg);
-                    if (j) {
-                        target_pid = j->pid;
-                    }
+                    if (j) target_pid = j->pid;
                 }
             }
 
             if (target_pid != -1) {
-                // SIGTERM is the default kill signal
                 if (kill(target_pid, SIGTERM) == -1) {
                     perror("kill");
+                } else {
+                    kill(target_pid, SIGCONT);
+                    int status;
+                    pid_t reaped = waitpid(target_pid, &status, WUNTRACED);
+                    if (reaped > 0) {
+                        job_t *j = find_job_by_pid(target_pid);
+                        if (j) {
+                            printf("[%d]+  Terminated  %s\n", j->job_id, j->name);
+                            fflush(stdout);
+                            remove_job(j);
+                        }
+                    }
                 }
             } else {
                 fprintf(stderr, "kill: %s: no such process or job\n", target_arg);
@@ -253,7 +260,9 @@ int main() {
 
             terminal_restore_shell_settings();
             handle_wait_status(child_pid, status, &last_status, args[0]);
+            ensure_newline();
         }
+        free(line);
     }
     return 0;
 }
