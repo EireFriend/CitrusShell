@@ -24,8 +24,8 @@ Citrus Shell is a custom shell built from scratch, focused on speed and simplici
     *   **Quoting**: Handles single (`'`) and double (`"`) quotes. Variable expansion functions inside double quotes but is ignored inside single quotes.
 *   **Command Line Editing**: Integrates with GNU readline for command history and tab completion. It currently utilizes readline's built in filename completion, though command and variable completion are not yet implemented.
 *   **Dynamic Prompt**: Features a custom prompt formatted as `username-citrus [folder] $` (or `#` if running as the root user).
-*   **Signal Handling**: The shell ignores `SIGINT`, `SIGTSTP`, and `SIGTTOU` so it survives user interrupts and terminal-control signals, while restoring default behavior in child processes so they can still be interrupted and suspended normally.
-*   **Terminal Recovery**: Automatically restores sane terminal settings after a foreground job exits or stops, and ensures the next prompt always starts on a clean line even if the previous command's output didn't end with a newline.
+*   **Signal Handling**: The shell ignores `SIGINT`, `SIGTSTP`, and `SIGTTOU` so it survives user interrupts and terminal control signals, while restoring default behavior in child processes so they can still be interrupted and suspended normally.
+*   **Terminal Recovery**: Restores terminal settings after a foreground job exits or stops, and ensures the next prompt always starts on a clean line even if the previous command's output didn't end with a newline.
 
 ---
 
@@ -42,7 +42,7 @@ CitrusShell/
     ├── completion.c/.h   # Readline tab completion
     ├── jobs.c/.h         # Job table and job control
     ├── terminal.c/.h     # Terminal state management
-    └── user.c/.h         # User/account info helpers
+    └── user.c/.h         # User info helpers
 ```
 
 ---
