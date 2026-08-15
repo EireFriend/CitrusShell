@@ -3,11 +3,17 @@ project(CitrusShell C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(CitrusShell main.c
-        parser.h
-        parser.c
-        completion.c
-        completion.h)
+add_executable(CitrusShell src/main.c
+        src/parser.h
+        src/parser.c
+        src/completion.c
+        src/completion.h
+        src/jobs.h
+        src/jobs.c
+        src/terminal.c
+        src/terminal.h
+        src/user.c
+        src/user.h)
 
 # --- Readline ---
 # macOS ships a BSD libedit under the readline.h name, not real GNU readline,

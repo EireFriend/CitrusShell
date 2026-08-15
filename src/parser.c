@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "user.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +8,6 @@
 #include <glob.h>
 #include <ctype.h>
 #include <unistd.h>
-#include <pwd.h>
 
 // Appends up to src_len bytes of src into out, clamped so out_len never
 // exceeds (always leaving room for a trailing '\0' later).
@@ -34,23 +34,7 @@ int expand_tilde(const char *in, char *out, size_t *out_len) {
            }
     name[n] = '\0';
 
-    const char *homedir = NULL;
-
-    if (n == 0) {
-        // Plain ~ corresponds to current user
-        homedir = getenv("HOME");
-
-        //If no HOME var fall back to password database
-        if (!homedir) {
-            struct passwd *pw = getpwuid(getuid());
-            if (pw) homedir = pw->pw_dir;
-        }
-    }
-    else {
-        // ~username corresponds to that user's home dir
-        struct passwd *pw = getpwnam(name);
-        if (pw) homedir = pw->pw_dir;
-    }
+    const char *homedir = (n == 0) ? get_home_dir() : resolve_user_home(name);
 
     if (homedir) {
         size_t hlen = strlen(homedir);
