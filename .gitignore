@@ -29,6 +29,10 @@ CitrusShell
 *.swp
 *~
 
+# Ignore all text files except CMakeLists.txt
+*.txt
+!CMakeLists.txt
+
 # OS
 .DS_Store
 Thumbs.db
