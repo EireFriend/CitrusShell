@@ -15,10 +15,8 @@ add_executable(CitrusShell src/main.c
         src/user.c
         src/user.h)
 
-# --- Readline ---
 # macOS ships a BSD libedit under the readline.h name, not real GNU readline,
-# so linking just "-lreadline" resolves to nothing (or the wrong lib) unless
-# we point CMake at another copy explicitly.
+# so linking just "-lreadline" resolves to nothing (or the wrong lib) unless it points CMake at another copy
 if(APPLE)
     execute_process(
             COMMAND brew --prefix readline

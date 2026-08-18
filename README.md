@@ -1,4 +1,4 @@
-# 🍋 Citrus Shell
+# Citrus Shell
 
 A fast, lightweight command line shell written in C.
 
@@ -57,7 +57,7 @@ CitrusShell/
 
 ---
 
-## Build 🛠️
+## Build
 
 ```
 mkdir build

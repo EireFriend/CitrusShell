@@ -27,7 +27,8 @@ int main() {
     char buff[FILENAME_MAX];
 
     rl_attempted_completion_function = completion; //Tab completion
-    rl_bind_key('\t', rl_menu_complete); // cycle matches in place on repeated Tab
+    rl_bind_key('\t', rl_menu_complete);
+    rl_completer_word_break_characters = " \t\n\"\\'`@><=;|&{(";
     rl_variable_bind("completion-ignore-case", "on");
 
     // Ignore SIGINT (Ctrl+C) in the shell itself so it survives when the
