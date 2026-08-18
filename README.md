@@ -22,7 +22,7 @@ Citrus Shell is a custom shell built from scratch, focused on speed and simplici
     *   **Wildcard Expansion**: Supports inline wildcard matching using `*` and `?`.
     *   **Variable Expansion**: Expands environment variables (`$VARNAME`), the last command's exit status (`$?`), the shell's process ID (`$$`), and the shell name (`$0`).
     *   **Quoting**: Handles single (`'`) and double (`"`) quotes. Variable expansion functions inside double quotes but is ignored inside single quotes.
-*   **Command Line Editing**: Integrates with GNU readline for command history and tab completion. It currently utilizes readline's built in filename completion, though command and variable completion are not yet implemented.
+*   **Command Line Editing**: Integrates with GNU readline, with command history and tab completion for commands, $VARIABLES, and file paths.
 *   **Dynamic Prompt**: Features a custom prompt formatted as `username-citrus [folder] $` (or `#` if running as the root user).
 *   **Signal Handling**: The shell ignores `SIGINT`, `SIGTSTP`, and `SIGTTOU` so it survives user interrupts and terminal control signals, while restoring default behavior in child processes so they can still be interrupted and suspended normally.
 *   **Terminal Recovery**: Restores terminal settings after a foreground job exits or stops, and ensures the next prompt always starts on a clean line even if the previous command's output didn't end with a newline.
