@@ -125,7 +125,7 @@ char **completion(const char *text, int start, int end) {
         return rl_completion_matches(text, variable_generator);
     }
 
-    if (is_command_position(start)) {
+    if (is_command_position(start) && !strchr(text, '/')) {
         return rl_completion_matches(text, command_generator);
     }
 

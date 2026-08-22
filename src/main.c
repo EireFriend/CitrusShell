@@ -17,6 +17,13 @@
 #include "terminal.h"
 #include "user.h"
 
+static int check_sigchld_event_hook(void) {
+    if (sigchld_pending) {
+        process_pending_sigchld();
+    }
+    return 0;
+}
+
 int main() {
     char *line = NULL;
     int last_status = 0;
@@ -27,6 +34,7 @@ int main() {
     char buff[FILENAME_MAX];
 
     rl_attempted_completion_function = completion; //Tab completion
+    rl_event_hook = check_sigchld_event_hook; // check for finished background jobs while idle
     rl_bind_key('\t', rl_menu_complete);
     rl_completer_word_break_characters = " \t\n\"\\'`@><=;|&{(";
     rl_variable_bind("completion-ignore-case", "on");
@@ -47,6 +55,13 @@ int main() {
 
     terminal_save_shell_settings();
 
+    char history_path[FILENAME_MAX] = {0};
+    const char *home = get_home_dir();
+    if (home) {
+        snprintf(history_path, sizeof(history_path), "%s/.citrus_history", home);
+        read_history(history_path);
+    }
+
     setvbuf(stdout, NULL, _IOLBF, 0);
     while (1) {
         if (sigchld_pending) {
@@ -63,7 +78,10 @@ int main() {
                  username, folder_name+1, isRootUser ? "#" : "$");
 
         line = readline(prompt); // Read (readline handles editing, Ctrl+D EOF)
-        if (!line) break;
+        if (!line) {
+            if (history_path[0]) write_history(history_path);
+            break;
+        }
 
         line[strcspn(line, "\n")] = 0; // Strip newline
         if (strlen(line) == 0) {
@@ -93,8 +111,20 @@ int main() {
         }
 
         if (strcmp(args[0], "exit") == 0) {
+            if (history_path[0]) write_history(history_path);
             free(line);
             break;
+        }
+
+        if (strcmp(args[0], "history") == 0) {
+            HIST_ENTRY **history = history_list();
+            if (history) {
+                for (int i = 0; history[i] != NULL; i++) {
+                    printf("%d  %s\n", i + 1, history[i]->line);
+                }
+            }
+            free(line);
+            continue;
         }
 
         if (strcmp(args[0], "cd") == 0) {

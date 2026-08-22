@@ -8,13 +8,14 @@ Citrus Shell is a custom shell built from scratch, focused on speed and simplici
 
 ## Features
 
-*   **Built in Commands**: Includes core shell commands such as `cd`, `exit`, `jobs`, `bg`, `fg`, and `kill`.
+*   **Built in Commands**: Includes core shell commands such as `cd`, `exit`, `jobs`, `bg`, `fg`, `history` and `kill`.
 *   **Job Control**:
     *   Tracks up to 16 concurrent jobs, each with its own process group.
     *   Supports running processes in the background by appending `&` to the command.
     *   Maintains job states as either running or stopped.
     *   Allows moving suspended jobs to the foreground with `fg` or resuming them in the background with `bg`, either by job id (`%n`), by the previous job (`%-`), or by defaulting to the current job.
     *   Displays the current (`+`) and previous (`-`) job in `jobs` output.
+    *   `history` displays command history. Command history is also saved and restored across different sessions.
     *   `kill` accepts a raw PID, a job id (`%n`), or a command name.
     *   Hands terminal control to the foreground job and reclaims it afterward, so job control doesn't corrupt terminal state.
 *   **Expansions & Parsing**:
